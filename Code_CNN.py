@@ -6,40 +6,35 @@ Created on Wed Apr  5 10:36:58 2017
 @author: Andreas Georgopoulos
 """
 
-import numpy as np
-import pandas as pd
-from matplotlib import pyplot
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.cross_validation import train_test_split
+from collections import Counter
 import matplotlib.pyplot as plt
+from matplotlib import pyplot
+import pandas as pd
+import numpy as np
+
 from keras.preprocessing.image import ImageDataGenerator
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import Dropout
-from keras.layers import Flatten
-from keras.layers.convolutional import Conv2D
-from keras.layers.convolutional import MaxPooling2D
+from keras.layers.convolutional import Conv2D, MaxPooling2D
+from keras.layers import Dense, Dropout, Flatten
 from keras.models import load_model
+from keras.models import Sequential
 from keras.utils import np_utils
 from keras import backend as K
 K.set_image_dim_ordering('th')
-from sklearn.cross_validation import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix
 
 
-
-""" Load Data """
-
+# Load Data -------------------------------------------------------------------------
 train_set = pd.read_csv("train.csv").dropna().values
 test_set  = pd.read_csv("test.csv").dropna().values
-
 train_labels = train_set[:,0]
-# reshape to be [samples][pixels][width][height]
+# Reshape to be [samples][pixels][width][height]
 train_images = train_set[:,1:].reshape(-1,1,28,28).astype('float32')
 test_set  = test_set[:,0:].reshape(-1,1,28,28).astype('float32')
 
 
 
-""" Visualise Data """
-
+# Visualise Data ----------------------------------------------------------------------
 train_set_vis = pd.read_csv("train.csv")
 plt.figure(figsize=(7,7))
 for digit_num in range(1,70):
@@ -53,12 +48,14 @@ plt.savefig('mnist_dataset')
 plt.show() 
 
 
+##########################################################################################
+#################### Pre Processing: Data Augmentation & Transformation ##################
+##########################################################################################
 
-""" Pre Processing: Data Augmentation & Transformation """
-
+# Set Seed
 seed = 7
 np.random.seed(seed)
-# Data Augmentation
+# Data Augmentation ---------------------------------------------------------------------
 data_augmen = ImageDataGenerator( 
             zca_whitening=True,
 		 width_shift_range=0.1,
@@ -105,7 +102,7 @@ np.save("train_labels_new.npy",train_labels_new)
 #train_labels_new = np.load("train_labels_new.npy")
 
 
-# Preprocess new images and initial ones
+# Preprocess new images and initial ones --------------------------------------------------
 
 # Split training set into train (80%) and validation set (20%) to test in-sample-performance
 training_images, validation_images, training_labels, validation_labels = train_test_split(train_images, train_labels, test_size=0.20, random_state=2)
@@ -127,9 +124,16 @@ num_classes = validation_labels.shape[1]
 
 
 
-""" Metrics- Classification report to df """
+
+##########################################################################################
+################################## Reporting - Metrics ###################################
+##########################################################################################
 
 def classifaction_report_csv(report):
+	"""    
+	Input: Classification report produced by sklearn
+	Output: Datframe of classification metrics
+	"""
     report_data = []
     lines = report.split('\n')
     for line in lines[2:-3]:
@@ -146,9 +150,12 @@ def classifaction_report_csv(report):
     
 
     
-""" Model Evaluation """
+##########################################################################################
+################################# CNN Model Evaluation ###################################
+##########################################################################################
 
-""" ----- Model 1 ------ """
+
+# Model 1 --------------------------------------------------------------------------------
 
 def base_model_2(): 
     model = Sequential()
@@ -204,7 +211,8 @@ report_model_2_df = classifaction_report_csv(report_model_2)
 report_model_2_df.to_csv('classification_report_model_2.csv', index = False)
 
 
-""" with data augmentation """
+# Model 1 with data augmentation ---------------------------------------------------------
+# Model 1 --------------------------------------------------------------------------------
 
 
 model_2_new = base_model_2()
@@ -235,15 +243,13 @@ np.savetxt("conf_matrix_model_2_new.csv", confusion_matrix(validation_true, vali
 
 # Classification report
 print(classification_report(validation_true, validation_pred_model_2_new))
-report_model_2_new = classification_report(validation_true, validation_pred_model_2_new)
-report_model_2_new_df = classifaction_report_csv(report_model_2_new)
+report_model_2_new_df = classifaction_report_csv(classification_report(validation_true, validation_pred_model_2_new))
 report_model_2_new_df.to_csv('classification_report_model_2_new.csv', index = False)
 
 
 
 
-
-""" ----- Model 2 ------ """
+# Model 2 --------------------------------------------------------------------------------
 
 def base_model_5(): 
     model = Sequential()
@@ -264,6 +270,7 @@ def base_model_5():
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
 
+# Generate Model
 model_5 = base_model_5()
 # Fit the model
 model_5.fit(training_images, training_labels, validation_data=(validation_images, validation_labels), epochs=10, batch_size=200, verbose=1)
@@ -271,7 +278,6 @@ model_5.fit(training_images, training_labels, validation_data=(validation_images
 model_5.save('model_5.h5')
 # Load model
 model_5 = load_model('model_5.h5')
-
 
 # Final evaluation of the model on validation set
 scores_5 = model_5.evaluate(validation_images, validation_labels, verbose=0)
@@ -298,8 +304,8 @@ report_model_5_df = classifaction_report_csv(report_model_5)
 report_model_5_df.to_csv('classification_report_model_5.csv', index = False)
 
  
-""" with data augmentation"""
 
+# Model 2 with data augmentation ---------------------------------------------------------
 
 model_5_new = base_model_5()
 # Fit the model
@@ -335,10 +341,7 @@ report_model_5_new_df.to_csv('classification_report_model_5_new.csv', index = Fa
 
 
 
-
-
-""" ----- Model 3 ------ """
-
+# Model 3 --------------------------------------------------------------------------------
 def base_model_very_deep(): 
     model = Sequential()
     model.add(Conv2D(filters = 64, kernel_size = (3, 3), input_shape = (1, 28, 28), activation='relu', padding='same'))
@@ -399,8 +402,8 @@ report_model_very_deep_df = classifaction_report_csv(report_model_very_deep)
 report_model_very_deep_df.to_csv('classification_report_model_deep.csv', index = False)
 
 
-""" with data augmentation """
 
+# Model 3 with data augmentation ---------------------------------------------------------
 
 model_deep_new = base_model_very_deep()
 # Fit the model
@@ -438,23 +441,20 @@ report_model_deep_new_df.to_csv('classification_report_model_deep_new.csv', inde
 
 
 
-""" ----- Ensemble Classifier of all models ------ """
+#  Ensemble Classifier of all models -----------------------------------------------------
 
+# Extract all predictions provided by aforementioned models
 predictions = [submission_cnn_keras_2, submission_cnn_keras_5_new, submission_cnn_keras_5, submission_cnn_keras_deep, submission_cnn_keras_deep_new]
 ensemble_pred = submission_cnn_keras_2_new
 ensemble_pred=ensemble_pred.rename(columns = {'Label':'Label_best'})
 for i in predictions:
     ensemble_pred = ensemble_pred.merge(i, on='ImageId')
 
-
-   
-from collections import Counter
-
 ensemble_pred["Label_ensemble"] = np.nan
 no_col = len(ensemble_pred.columns)
 for i in range(0,len(ensemble_pred)):
     c = Counter(ensemble_pred.iloc[i,1:6].values)
-    # find majority vote if not tie
+    # Find majority vote if not tie
     if len(Counter(ensemble_pred.iloc[i,1:6].values).most_common(1)[0]) == 2:
         ens_pred = Counter(ensemble_pred.iloc[i,1:6].values).most_common(1)[0][0].astype(int)
     else:
@@ -470,4 +470,8 @@ submission_cnn_ensemble = pd.DataFrame({
 submission_cnn_ensemble.to_csv("submission_cnn_ensemble.csv", index=False) # kaggle score 0.99286
 
 
-""" ----- END ----- """
+##########################################################################################
+######################################### END ############################################
+##########################################################################################
+
+
